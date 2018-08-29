@@ -1,27 +1,32 @@
-
 from time import sleep
 import numpy as np
 import socket
 import pickle
 import struct
+from pandas import DataFrame
 import threading
 import smtplib
 import time
 import os
+import sys
 from email.mime.image import MIMEImage;
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-
 import cv2
+
 
 face_cascade = cv2.CascadeClassifier(r"frontalface_default.xml");
 walker_data = cv2.CascadeClassifier(r"pedestrian.xml")
 car_data = cv2.CascadeClassifier(r"cars.xml")
+
+
+
 # bike_data = cv2.CascadeClassifier(r"C:\users\Natesh\Documents\motorbike.xml")
 # cycle_data =  cv2.CascadeClassifier(r"C:\users\Natesh\Documents\bicycle.xml")
 
 
-cap = cv2.VideoCapture(r"cars1.avi")
+
+cap = cv2.VideoCapture(r"cars2.avi")
 #cap = cv2.VideoCapture(0) ;
 
 print("\nConnected to server.\n") ;
@@ -32,6 +37,8 @@ print("\nConnected to server.\n") ;
 flag_stop_usual_signal_loop = False;
 total_number_red_bypasses = 0;
 vehicles_count = [];
+present_vehicle_count = 0 ;
+
 global_frame = None;
 
 
@@ -46,6 +53,8 @@ def take_commands_from_app(sapp):
     while (1):
         msg = app.recv(4096).decode();
 
+        if not msg:
+            break ;
         print("CLIENT SENT : {}".format(msg));
 
         if "sendmail" in msg:
@@ -53,10 +62,33 @@ def take_commands_from_app(sapp):
             mailsending();
 
 
+    take_commands_from_app(sapp) ;
+
+
+
+def save_excel(average_vehicle_count):
+    global total_number_red_bypasses
+    global present_vehicle_count
+
+    # total_number_red_bypasses = 10
+    # present_vehicle_count = 20 ;
+
+
+    df = DataFrame({"Date and Time": time.asctime(), "Average_vehicle_count": [average_vehicle_count],
+                    "Current Vehicle count": present_vehicle_count,
+                    "Number_of_red_signal_bypassers": total_number_red_bypasses})  ;
+
+
+    myheader = False if os.path.isfile("Traffic data.csv") else True ;
+
+    df.to_csv("Traffic data.csv" , mode='a', index=False , header=myheader);
+
+
 
 
 def mailsending(message=None):
     global total_number_red_bypasses ;
+    global present_vehicle_count ;
     if message is None:
         msg = MIMEMultipart();
         if os.path.isfile("bypass.jpg"):
@@ -65,15 +97,22 @@ def mailsending(message=None):
         msg['From'] = "Intel Control Board"
         msg['To'] = "Traffic management"
 
+
+        average_vehicle_count = int(sum(vehicles_count) / (len(vehicles_count) if len(vehicles_count) else 1))
+
+        save_excel(average_vehicle_count) ;
+
         text = MIMEText("""
 Traffic Report :\n
 Date and Time : {}
 Average number of vehicles : {}
+Number of vehicles in the current frame : {}
 
-Number of vehicles which bypasses the signal : {}""".format(time.asctime(), int(
-            sum(vehicles_count) / (len(vehicles_count) if len(vehicles_count) else 1)), total_number_red_bypasses))
+Number of vehicles which bypassed the signal : {}""".format(time.asctime(), average_vehicle_count, present_vehicle_count ,total_number_red_bypasses))
+
 
         msg.attach(text);
+
         if (os.path.isfile("bypass.jpg")):
             image = MIMEImage(img_data, name="{}".format(time.asctime()));
             msg.attach(image)
@@ -101,7 +140,7 @@ Traffic Report :\n
 Date and Time : {}
 Average number of vehicles : {}
 
-Number of vehicles which bypasses the signal : {}""".format(time.asctime(), int(
+Number of vehicles which bypassed the signal : {}""".format(time.asctime(), int(
                 sum(vehicles_count) / (len(vehicles_count) if len(vehicles_count) else 1)), total_number_red_bypasses);
 
             obj = smtplib.SMTP("smtp.gmail.com", 587);
@@ -126,6 +165,7 @@ def smssending(message):
         client = Client("ACbd6f505b95082979dc6c0a74d5a81393", "df56a2ea3929758b6fcda6b75d8b7343");
         client.messages.create(to="+919481575049", from_="+19137474599", body=message);
         print("Message sent successfully");
+
     except(KeyboardInterrupt):
         print("Program terminated by user ! ");
         exit();
@@ -135,8 +175,10 @@ def smssending(message):
 
 
 
+
 def node_mcu_signals_manage():
     global flag_stop_usual_signal_loop
+    global present_vehicle_count ;
     while (1):
         if (not flag_stop_usual_signal_loop):
             for i in ["A", "B", "C", "D"]:
@@ -145,8 +187,14 @@ def node_mcu_signals_manage():
                 if flag_stop_usual_signal_loop:
                     break;
             continue;
-        sleep(10);
+
+        print("\n\n\n--------------------\nHIGH TRAFFIC DETECTED !!!\n--------------------\n\n");
+        if(present_vehicle_count==6):
+            sleep(10);
+        if(present_vehicle_count==8):
+            sleep(13) ;
         flag_stop_usual_signal_loop = False;
+
 
 
 
@@ -228,10 +276,10 @@ def temporary_Funtion_to_check_image_processing():
 
         for (x, y, j, k) in cars:
             cv2.rectangle(frame, (x, y), (x + j, y + k), (0, 255, 0), 2);
-
-        cv2.imshow('image', frame);
-        if (cv2.waitKey(1) == ord('q')):
-            break;
+        #
+        # cv2.imshow('image', frame);
+        # if (cv2.waitKey(1) == ord('q')):
+        #     break;
 
         if (len(cars) >= 6):
             if ('node' in globals()):
@@ -246,19 +294,19 @@ def temporary_Funtion_to_check_image_processing():
 
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM);
 s.connect(("10.255.255.255", 0));
-ref = s.getsockname()[0]
+myip = s.getsockname()[0]
 
 snode = socket.socket();
 snode.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-snode.bind((ref, 34569));  # DATA SENDING TO NODE MCU
+snode.bind((myip, 34569));  # DATA SENDING TO NODE MCU
 
-sapp = socket.socket(socket.AF_INET, socket.SOCK_STREAM);
+
 sapp = socket.socket(socket.AF_INET, socket.SOCK_STREAM);
 sapp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-sapp.bind((ref, 8888));
+sapp.bind((myip, 8888));
 
-print("\nNODE MCU server ip : {}\nPort : {}\n".format(ref, 34569));
-print("\nAPP server ip : {} \nPort : {}\n".format(ref, 8888));
+print("\nNODE MCU server ip : {}\nPort : {}\n".format(myip, 34569));
+print("\nAPP server ip : {} \nPort : {}\n".format(myip, 8888));
 
 sapp.listen(20);
 snode.listen(100)
@@ -275,6 +323,7 @@ threading.Thread(target=wait_for_node_mcu, args=[snode]).start();
 
 while (1):
     try:
+        sleep(0.1) ;
 
         frame = cap.read()
 
@@ -304,15 +353,17 @@ while (1):
 
         cars = car_data.detectMultiScale(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), 1.1, 1);
 
+        present_vehicle_count = len(cars) ;
+
         for (x, y, j, k) in cars:
             cv2.rectangle(frame, (x, y), (x + j, y + k), (0, 255, 0), 2);
 
-        cv2.imshow("Security Feed", frame)
-        if cv2.waitKey(1)==ord('q'):break;
-
+        # cv2.imshow("Security Feed", frame)
+        # if cv2.waitKey(1)==ord('q'):break;
 
 
         print("Vehicles detected : ", len(cars))
+
 
         if (len(cars) >= 6):
             if ('node' in globals()):
@@ -325,11 +376,16 @@ while (1):
     # for(x,y,j,k) in cars:
     #     cv2.rectangle(frame , (x, y) , (x+j , y+k) , (0,255 , 0) , 2) ;
 
-
     # cv2.destroyAllWindows() ;
 
 
-    except(KeyboardInterrupt):
+    except(KeyboardInterrupt , SystemExit):
         print("\nINTERRUPTED BY USER !!! EXITING");
-        s.close();
-        break;
+        try:
+            snode.close()   ;
+            sapp.close()    ;
+            s.close()       ;
+        except:
+            sys.exit(100) ;
+        finally:
+            sys.exit(10) ;
