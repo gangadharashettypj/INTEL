@@ -81,8 +81,8 @@ Number of vehicles which bypasses the signal : {}""".format(time.asctime(), int(
         try:
             obj = smtplib.SMTP("smtp.gmail.com", 587);
             obj.starttls();
-            obj.login("nateshmbhatofficial@gmail.com", "inteledison123");
-            obj.sendmail("nateshmbhat1@gmail.com", ["nateshmbhatofficial@gmail.com", "gangadharashetty.gs@gmail.com"],
+            obj.login("sitcosmos@gmail.com", "WhoAreYou@123");
+            obj.sendmail("sitcosmos@gmail.com", ["nateshmbhatofficial@gmail.com", "gangadharashetty.gs@gmail.com"],
                          msg.as_string());
             print("Mail sent successfully ! ");
         except(KeyboardInterrupt):

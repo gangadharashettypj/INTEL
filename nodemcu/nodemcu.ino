@@ -2,10 +2,10 @@
 #include <WiFiClient.h>
 
 // Hardcode WiFi parameters as this isn't going to be moving around.
-const char* ssid = "SJBIT3";
-const char* password = "sjbit@1912";
+const char* ssid = "robodev";
+const char* password = "robodevs";
 
-const char* ip  = "192.168.68.223"  ;
+const char* ip  = "192.168.43.170"  ;
 int port = 34569 ;
 
 // Start a TCP Server on port 5045
@@ -67,7 +67,8 @@ void loop()
       if(flag1)
         flag1=0;
     }
-  if(flag==1 && flag1==0 && msg[0]=='A')
+  if(flag==1 && flag1==0 && (msg[0]=='B'|| msg[0]=='C' || msg[0]=='D'))
+
     {
       char msg[60]; 
       msg[0]='F';
@@ -76,7 +77,7 @@ void loop()
       client.print("bypassed\n"); 
       flag1=1; 
     }
-  delay(500);
+  delay(100);
   
 
 
@@ -89,5 +90,3 @@ void loop()
   }*/
 
 }
-
-
